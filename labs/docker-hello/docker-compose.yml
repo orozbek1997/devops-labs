@@ -1,0 +1,5 @@
+services:
+  hello:
+    build: .
+    image: hello-docker:latest
+    command: ["python", "hello.py"]
