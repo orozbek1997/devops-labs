@@ -1,0 +1,11 @@
+name: Hello CI
+
+on:
+  push:               # запускать при любом push
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print message
+        run: echo "Hello CI/CD from GitHub Actions!"
