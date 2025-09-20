@@ -1,20 +1,35 @@
-name: Build and Push Docker image to GHCR
+name: docker-hello CI/CD
 
 on:
   push:
-    branches: [ "main" ]   # запуск при пуше в main
-  workflow_dispatch:       # и вручную из GitHub Actions
+    branches: [ "main" ]                 # ← или твоя ветка, см. git branch --show-current
+    paths:
+      - "labs/docker-hello/**"
+      - ".github/workflows/docker-build-push.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Клонируем код
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python -m pip install --upgrade pip pytest
+      - name: Run tests
+        working-directory: labs/docker-hello
+        run: python -m pytest -q
 
-      # 2. Логинимся в GHCR
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -22,10 +37,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Собираем и пушим Docker-образ
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Extract owner (lowercase)
+        id: meta
+        run: echo "owner_lower=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: labs/docker-hello
+          file: labs/docker-hello/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/devops-labs:latest
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner_lower }}/${{ github.event.repository.name }}/docker-hello:latest
+            ghcr.io/${{ steps.meta.outputs.owner_lower }}/${{ github.event.repository.name }}/docker-hello:${{ github.sha }}
